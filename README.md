@@ -1,4 +1,4 @@
-# FiddlerToLoadImpact
+# Fiddler To Load Impact k6 script
 Export Fiddler recordings to Load Impact k6 script
 
 Adding a new handler in Fiddler.js
