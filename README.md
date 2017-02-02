@@ -35,4 +35,5 @@ FiddlerObject.UI.lvSessions.AddBoundColumn("LI Group", 512, "addon.loadimpact.li
 
 This adds a named column, "LI Group", of size 512 characters and with the o-flag "addon.loadimpact.ligroup". Both the o-flag value and the column name are used in the exporter so don't change them unless you really know what you're doing and update the exporter code as well.
 
+Oh, and where is Fidller you might wonder?  [Fiddler](http://www.telerik.com/fiddler)
 
