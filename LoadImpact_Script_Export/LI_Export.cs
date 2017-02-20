@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Fiddler;
+using MimeKit;
 
 [assembly: Fiddler.RequiredVersion("2.4.0.0")]
 
@@ -77,11 +78,92 @@ function rnd(min, max) {
                 if (head.Text == textkey)
                 {
                     idx = head.Index;
-                    break;
+                    return idx;
                 }
             }
 
+            // If we get here, it wasn't found
+
             return idx;
+        }
+
+
+        // Write multipart data
+        private void addMultipart(MimeEntity mimeBody, 
+                                  string strFilename,
+                                  ref int iSequence,
+                                  ref StringBuilder strbHead, 
+                                  ref StringBuilder strbBody)
+        {
+            var multipart = mimeBody as Multipart;
+
+            strbBody.AppendLine("`");
+            foreach (MimePart part in multipart)
+            {
+                strbBody.AppendLine();
+                strbBody.AppendLine();
+                strbBody.AppendLine("--" + multipart.Boundary);
+
+                foreach (Header head in part.Headers)
+                {
+                    strbBody.AppendLine(head.ToString());
+                }
+                strbBody.AppendLine();
+
+                // if the part is multipart - recurse
+
+                if (part.ContentType.MediaType.Contains("multipart"))
+                {
+                    addMultipart(part, strFilename, ref iSequence, ref strbHead, ref strbBody);
+                }
+                else
+                {
+                    StreamReader sr = new StreamReader(part.ContentObject.Stream);
+                    string strBody = sr.ReadToEnd(); 
+
+                    if ((part.ContentTransferEncoding == ContentEncoding.Binary) || (Regex.IsMatch(strBody, "[\x00-\x08\x0E-\x1F\x80-\xFF]")))
+                    {
+                        // It's binary
+                        // Save binary part to file,
+                        // load binary in script
+                        // use binary in multipart
+
+                        // Save as binary file and use binary content
+                        // same location as Script output since that is allowed to be written
+                        // Append open to header before function
+
+                        string strCat = Path.GetDirectoryName(Path.GetFullPath(strFilename));
+
+                        string strData = "bin" + iSequence;
+                        string strOutfile = strCat + "\\" + strData + ".bin";
+                        FileStream f = new FileStream(strOutfile, FileMode.OpenOrCreate, FileAccess.Write);
+
+                        part.ContentObject.Stream.Position = 0;
+                        part.ContentObject.Stream.CopyTo(f);
+                        f.Close();
+
+                        strbHead.AppendLine();
+                        strbHead.AppendLine(strData + " = open(\"" + strData + ".bin\");");
+                        strbHead.AppendLine();
+
+                        strbBody.AppendLine("` + " + strData + " + `");
+
+                        iSequence++;
+                    }
+                    else
+                    {
+                        // It's not binary, just write it.
+                        // Make sure we escape all double quotes " since we use double quotes for strings in the script
+
+                        strBody = strBody.Replace("\"", "\\\"");
+
+                        strbBody.Append(strBody);
+                    }
+                }
+            }
+            strbBody.AppendLine();
+            strbBody.Append("--" + multipart.Boundary + "--");
+            strbBody.AppendLine("`");
         }
 
         public bool ExportSessions(string sFormat, 
@@ -156,7 +238,9 @@ function rnd(min, max) {
                 strbBody.Append(@"
 // Use a top-level function wrapper to allow us to return from it. If you don't need to
 // return from your script at any point, you can skip the wrapper - VU scopes are isolated.
-export default function() {"
+export default function() {
+
+"
                     );
 
                 #region WriteEachSession
@@ -247,27 +331,43 @@ export default function() {"
                         {
                             // handle different types of data
 
-                            // Is it binary?
+                            // Is it multipart?
+                            // Or is it binary?
                             // /[\x00-\x08\x0E-\x1F\x80-\xFF]
 
-                            if (Regex.IsMatch(System.Text.Encoding.UTF8.GetString(oS.RequestBody), "[\x00-\x08\x0E-\x1F\x80-\xFF]") || Utilities.IsBinaryMIME(oS.RequestHeaders["Content-Type"]))
+                            if (strContentType.Contains("multipart"))
                             {
-                                // Is binary - encode
-                                // Re-encode binary
-                                // Output as BODY for POST
+                                strbBody.Append(", ");
 
+                                // Need to write all the multipart stuff to a variable and use it
+
+                                addMultipart(MimeEntity.Load(ContentType.Parse(oS.RequestHeaders["Content-Type"]), new MemoryStream(System.Text.Encoding.UTF8.GetBytes(oS.GetRequestBodyAsString()))),
+                                             sFilename,
+                                             ref iBinarySequence,         
+                                             ref strbHead, 
+                                             ref strbBody);
+
+
+                                // Make sure we escape all double quotes " since we use double quotes for strings in the script
+
+                                string strCT = headers["Content-Type"];
+                                strCT = strCT.Replace("\"", "\\\"");
+
+                                strbBody.Append(", { headers: { \"Content-Type\" : \"" + strCT + "\"} }");
+                            }
+                            else if (Regex.IsMatch(System.Text.Encoding.UTF8.GetString(oS.RequestBody), "[\x00-\x08\x0E-\x1F\x80-\xFF]") || Utilities.IsBinaryMIME(oS.RequestHeaders["Content-Type"]))
+                            {
                                 // Save as binary file and use binary content
                                 // same location as Script output since that is allowed to be written
                                 // Append open to header before function
 
                                 string strCat = Path.GetDirectoryName(Path.GetFullPath(sFilename));
-                                
+
                                 string strData = "bin" + iBinarySequence;
                                 string strFilename = strCat + "\\" + strData + ".bin";
                                 FileStream f = new FileStream(strFilename, FileMode.OpenOrCreate, FileAccess.Write);
-                                f.Write(oS.RequestBody,0,oS.RequestBody.Length);
+                                f.Write(oS.RequestBody, 0, oS.RequestBody.Length);
                                 f.Close();
-
 
                                 strbHead.AppendLine();
                                 strbHead.AppendLine(strData + " = open(\"" + strData + ".bin\");");
@@ -280,7 +380,8 @@ export default function() {"
                                 // Is text
                                 // Output BODY for POST
 
-                                string strBody = System.Text.Encoding.UTF8.GetString(oS.RequestBody);
+                                string strBody = oS.GetRequestBodyAsString();
+                                //System.Text.Encoding.UTF8.GetString(oS.RequestBody);
 
                                 // Make sure we escape all double quotes " since we use double quotes for strings in the script
 
@@ -293,7 +394,6 @@ export default function() {"
                                 }
                             }
                         }
-
 
 
                         if ((inGroup) && (oS == oSessions.Last()))
@@ -328,9 +428,7 @@ export default function() {"
                 #endregion WriteEachSession
 
                 #region WriteFoot
-//                swOutput.Write(k6Foot);
                 strbFoot.Append(k6Foot);
-//                swOutput.WriteLine();
                 strbFoot.AppendLine();
                 #endregion WriteFoot
 
