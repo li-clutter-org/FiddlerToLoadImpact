@@ -262,6 +262,13 @@ export default function() {
                             fSkip = Utilities.IsRedirectStatus(oS.responseCode);
                         }
 
+
+                        // Figure out time between last request and this request
+                        // If > threshold -> insert sleep time
+
+                        TimeSpan dtDiff = oS.Timers.ClientBeginRequest - dtPrevious;
+                        dtPrevious = oS.Timers.ClientDoneRequest;
+
                         // Find out if we are starting a new group, finishing a group or are in a group
 
                         string strVal = oS.ViewItem.SubItems[iCol].Text;
@@ -269,6 +276,13 @@ export default function() {
                         if ((!inGroup) && (strVal.Length > 0))
                         {
                             // NEW group from NO group, write the header
+
+                            // Insert sleep _before_ if needed
+
+                            if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
+                            {
+                                strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
+                            }
 
                             strCurrentGroup = strVal;
                             strbBody.AppendLine("\tgroup (\"" + strCurrentGroup + "\", function () {");
@@ -283,6 +297,12 @@ export default function() {
                             strbBody.AppendLine("\t});");
                             strbBody.AppendLine();
 
+                            // Insert sleep _between_ groups
+                            if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
+                            {
+                                strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
+                            }
+
                             inGroup = true;
                             strCurrentGroup = strVal;
                             strbBody.AppendLine("\tgroup (\"" + strCurrentGroup + "\", function () {");
@@ -296,20 +316,27 @@ export default function() {
                             strbBody.AppendLine();
                             inGroup = false;
                             strCurrentGroup = strVal;
+
+                            // If sleep applies after last step in group
+
+                            if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
+                            {
+                                strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
+                            }
                         }
-
-
-                        // Figure out time between last request and this request
-                        // If > threshold -> insert sleep time
-                        // BUT we should check if we just finished/started a group - then it should be between groups...
-
-                        TimeSpan dtDiff = oS.Timers.ClientBeginRequest - dtPrevious;
-
-                        if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
+                        else
                         {
-                            strbBody.AppendLine("\nsleep(" + dtDiff.Seconds + ");\n");
+                            // NO group from NO group
+                            // sleep might apply
+
+                            if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
+                            {
+                                strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
+                            }
                         }
-                        dtPrevious = oS.Timers.ClientDoneRequest;
+
+
+
 
                         // Always print request plain to file
 
