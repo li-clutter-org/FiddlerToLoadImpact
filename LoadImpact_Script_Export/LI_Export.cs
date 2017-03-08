@@ -66,8 +66,11 @@ function rnd(min, max) {
 }";
 
         // Threshold for when sleep is auto generated between requests
+        // Threshold for automatically generating batches (i.e. max diff of request starting time to be included in a batch)
 
         private static int sSleepThreshold = 2;
+
+        // Threshold for automatically generating batches (i.e. max diff of request starting time to be included in a batch)
 
         private int getIndexOfText(ListView.ColumnHeaderCollection heads, string textkey)
         {
@@ -97,7 +100,6 @@ function rnd(min, max) {
         {
             var multipart = mimeBody as Multipart;
 
-            strbBody.AppendLine("`");
             foreach (MimePart part in multipart)
             {
                 strbBody.AppendLine();
@@ -142,7 +144,6 @@ function rnd(min, max) {
                         part.ContentObject.Stream.CopyTo(f);
                         f.Close();
 
-                        strbHead.AppendLine();
                         strbHead.AppendLine(strData + " = open(\"" + strData + ".bin\");");
                         strbHead.AppendLine();
 
@@ -163,7 +164,153 @@ function rnd(min, max) {
             }
             strbBody.AppendLine();
             strbBody.Append("--" + multipart.Boundary + "--");
-            strbBody.AppendLine("`");
+        }
+
+
+        // Process POST data
+
+        private void processPOST(Session oS, 
+                                 ref StringBuilder strbBody,
+                                 ref StringBuilder strbHead,
+                                 ref int iBinarySequence,
+                                 string sFilename)
+        {
+            HTTPRequestHeaders headers = oS.RequestHeaders;
+            string strContentType = "";
+
+            // find out if we have a content-type
+
+            if (headers.Exists("Content-Type"))
+            {
+                strContentType = headers["Content-Type"];
+            }
+            else
+            {
+                strContentType = "";
+            }
+
+            if (oS.RequestBody.Length > 0)
+            {
+                // handle different types of data
+
+                // Is it multipart?
+                // Or is it binary?
+                // /[\x00-\x08\x0E-\x1F\x80-\xFF]
+
+                if (strContentType.Contains("multipart"))
+                {
+                    strbBody.AppendLine(", \"body\" : `");
+
+                    // Need to write all the multipart stuff to a variable and use it
+
+                    addMultipart(MimeEntity.Load(ContentType.Parse(oS.RequestHeaders["Content-Type"]), new MemoryStream(System.Text.Encoding.UTF8.GetBytes(oS.GetRequestBodyAsString()))),
+                                 sFilename,
+                                 ref iBinarySequence,
+                                 ref strbHead,
+                                 ref strbBody);
+
+                    strbBody.AppendLine("`");
+
+                    // Make sure we escape all double quotes " since we use double quotes for strings in the script
+
+                    string strCT = headers["Content-Type"];
+                    strCT = strCT.Replace("\"", "\\\"");
+
+                    strbBody.Append(", \"params\" : { headers: { \"Content-Type\" : \"" + strCT + "\"} }");
+                }
+                else if (Regex.IsMatch(System.Text.Encoding.UTF8.GetString(oS.RequestBody), "[\x00-\x08\x0E-\x1F\x80-\xFF]") || Utilities.IsBinaryMIME(oS.RequestHeaders["Content-Type"]))
+                {
+                    // Save as binary file and use binary content
+                    // same location as Script output since that is allowed to be written
+                    // Append open to header before function
+
+                    string strCat = Path.GetDirectoryName(Path.GetFullPath(sFilename));
+
+                    string strData = "bin" + iBinarySequence;
+                    string strFilename = strCat + "\\" + strData + ".bin";
+                    FileStream f = new FileStream(strFilename, FileMode.OpenOrCreate, FileAccess.Write);
+                    f.Write(oS.RequestBody, 0, oS.RequestBody.Length);
+                    f.Close();
+
+                    strbHead.AppendLine(strData + " = open(\"" + strData + ".bin\");");
+                    strbHead.AppendLine();
+                    strbBody.Append(", \"body\" : " + strData);
+                    iBinarySequence++;
+
+                    if (headers.Exists("Content-Type"))
+                    {
+                        strbBody.Append(", \"params\" : { headers: { \"Content-Type\" : \"" + headers["Content-Type"] + "\"} }");
+                    }
+
+                }
+                else
+                {
+                    // Is text
+                    // Output BODY for POST
+
+                    string strBody = oS.GetRequestBodyAsString();
+                    //System.Text.Encoding.UTF8.GetString(oS.RequestBody);
+
+                    // Make sure we escape all double quotes " since we use double quotes for strings in the script
+
+                    strBody = strBody.Replace("\"", "\\\"");
+
+                    strbBody.Append(", \"body\" :  \"" + strBody + "\"");
+                    if (headers.Exists("Content-Type"))
+                    {
+                        strbBody.Append(", \"params\" : { headers: { \"Content-Type\" : \"" + headers["Content-Type"] + "\"} }");
+                    }
+                }
+            }
+        }
+
+        // Terminate batches actually writes them
+        private void terminateBatches(Dictionary<string, List<Session>> dictBatches, 
+                                      ref StringBuilder strbBody,
+                                      ref StringBuilder strbHead,
+                                      ref int iBinarySequence,
+                                      string sFilename)
+        {
+            foreach (KeyValuePair<string, List<Session>> kvp in dictBatches)
+            {
+
+                // Start batch
+
+                strbBody.AppendLine("\thttp.batch([");
+
+                foreach (Session oS in kvp.Value)
+                {
+                    string strRequest = "";
+
+                    // If I am not the first request, I am one in a list of several
+
+                    if (oS != kvp.Value.First())
+                    {
+                        strbBody.AppendLine(",");
+                    }
+
+                    // Request
+
+                    strRequest = "\t\t{\"method\" : \"" + oS.RequestMethod.ToUpper() + "\", \"url\" : \"" + oS.fullUrl + "\"";
+
+                    strbBody.Append(strRequest);
+
+                    processPOST(oS, 
+                                ref strbBody,
+                                ref strbHead,
+                                ref iBinarySequence,
+                                sFilename);
+
+                    strbBody.Append("}");
+
+                }
+
+                // End batch
+
+                strbBody.AppendLine();
+                strbBody.AppendLine("\t]);");
+            }
+
         }
 
         public bool ExportSessions(string sFormat, 
@@ -222,10 +369,10 @@ function rnd(min, max) {
                 int iCount = 0;
                 int iMax = oSessions.Length;
                 Fiddler.HTTPRequestHeaders headers;
-                string strContentType = "";
                 bool fSkip = false;
                 int iBinarySequence = 1;
-                DateTime dtPrevious = oSessions.First<Session>().Timers.ClientDoneRequest;
+                DateTime dtPrevious = oSessions.First<Session>().Timers.ClientDoneResponse;
+                Dictionary<string, List<Session>> bg = null;
 
                 #region WriteHead
                 strbHead.Append(k6Head);
@@ -244,6 +391,7 @@ export default function() {
                     );
 
                 #region WriteEachSession
+
                 foreach (Session oS in oSessions)
                 {
                     iCount++;
@@ -262,12 +410,11 @@ export default function() {
                             fSkip = Utilities.IsRedirectStatus(oS.responseCode);
                         }
 
-
                         // Figure out time between last request and this request
                         // If > threshold -> insert sleep time
 
                         TimeSpan dtDiff = oS.Timers.ClientBeginRequest - dtPrevious;
-                        dtPrevious = oS.Timers.ClientDoneRequest;
+                        dtPrevious = oS.Timers.ClientDoneResponse;
 
                         // Find out if we are starting a new group, finishing a group or are in a group
 
@@ -276,6 +423,18 @@ export default function() {
                         if ((!inGroup) && (strVal.Length > 0))
                         {
                             // NEW group from NO group, write the header
+
+                            // Terminate batches - except first request since it will not be in a batch
+
+                            if (bg != null)
+                            {
+                                terminateBatches(bg, ref strbBody, ref strbHead, ref iBinarySequence, sFilename);
+
+                                // Dispose manually
+
+                                bg.Clear();
+                                bg = null;
+                            }
 
                             // Insert sleep _before_ if needed
 
@@ -287,12 +446,28 @@ export default function() {
                             strCurrentGroup = strVal;
                             strbBody.AppendLine("\tgroup (\"" + strCurrentGroup + "\", function () {");
 
+                            // START NEW BATCH COLLECTION
+
+                            bg = new Dictionary<string, List<Session>>();
+
+                            // Set flag
+
                             inGroup = true;
                         }
                         else if ((inGroup) && (strVal.Length > 0) && (strVal != strCurrentGroup))
                         {
                             // NEW group from OLD group
                             // write footer to end old and header for new
+
+                            // Terminate batches
+
+                            terminateBatches(bg, ref strbBody, ref strbHead, ref iBinarySequence, sFilename);
+
+                            // Dispose manually
+
+                            bg.Clear();
+                            bg = null;
+
 
                             strbBody.AppendLine("\t});");
                             strbBody.AppendLine();
@@ -306,11 +481,24 @@ export default function() {
                             inGroup = true;
                             strCurrentGroup = strVal;
                             strbBody.AppendLine("\tgroup (\"" + strCurrentGroup + "\", function () {");
+
+                            // START NEW BATCH COLLECTION
+
+                            bg = new Dictionary<string, List<Session>>();
                         }
                         else if ((inGroup) && (strVal.Length == 0))
                         {
                             // NO group from OLD group
                             // write footer to close group
+
+                            // Terminate batches
+
+                            terminateBatches(bg, ref strbBody, ref strbHead, ref iBinarySequence, sFilename);
+
+                            // Dispose manually
+
+                            bg.Clear();
+                            bg = null;
 
                             strbBody.AppendLine("\t});");
                             strbBody.AppendLine();
@@ -323,119 +511,92 @@ export default function() {
                             {
                                 strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
                             }
+
+                            // START NEW BATCH COLLECTION
+
+                            bg = new Dictionary<string, List<Session>>();
                         }
                         else
                         {
-                            // NO group from NO group
+                            // NO group from NO group or IN GROUP STAYING IN GROUP
                             // sleep might apply
+
+                            // Check if batch shall be terminated by timespan, same as sleep
 
                             if (dtDiff >= TimeSpan.FromSeconds(sSleepThreshold))
                             {
+                                // Terminate batches - except first request since it will not be in a batch
+
+                                if (bg != null)
+                                {
+                                    terminateBatches(bg, ref strbBody, ref strbHead, ref iBinarySequence, sFilename);
+
+                                    // Dispose manually
+
+                                    bg.Clear();
+                                    bg = null;
+                                }
+
                                 strbBody.AppendLine("\n\tsleep(" + dtDiff.Seconds + ");\n");
-                            }
-                        }
 
+                                // START NEW BATCH COLLECTION
 
-
-
-                        // Always print request plain to file
-
-                        strbBody.Append("\thttp." + oS.RequestMethod.ToLower() + "(\"" + oS.fullUrl + "\"");
-
-
-                        // find out if we have a content-type
-                        headers = oS.RequestHeaders;
-                        if (headers.Exists("Content-Type"))
-                        {
-                            strContentType = headers["Content-Type"];
-                        }
-                        else
-                        {
-                            strContentType = "";
-                        }
-
-                        if (oS.RequestBody.Length > 0)
-                        {
-                            // handle different types of data
-
-                            // Is it multipart?
-                            // Or is it binary?
-                            // /[\x00-\x08\x0E-\x1F\x80-\xFF]
-
-                            if (strContentType.Contains("multipart"))
-                            {
-                                strbBody.Append(", ");
-
-                                // Need to write all the multipart stuff to a variable and use it
-
-                                addMultipart(MimeEntity.Load(ContentType.Parse(oS.RequestHeaders["Content-Type"]), new MemoryStream(System.Text.Encoding.UTF8.GetBytes(oS.GetRequestBodyAsString()))),
-                                             sFilename,
-                                             ref iBinarySequence,         
-                                             ref strbHead, 
-                                             ref strbBody);
-
-
-                                // Make sure we escape all double quotes " since we use double quotes for strings in the script
-
-                                string strCT = headers["Content-Type"];
-                                strCT = strCT.Replace("\"", "\\\"");
-
-                                strbBody.Append(", { headers: { \"Content-Type\" : \"" + strCT + "\"} }");
-                            }
-                            else if (Regex.IsMatch(System.Text.Encoding.UTF8.GetString(oS.RequestBody), "[\x00-\x08\x0E-\x1F\x80-\xFF]") || Utilities.IsBinaryMIME(oS.RequestHeaders["Content-Type"]))
-                            {
-                                // Save as binary file and use binary content
-                                // same location as Script output since that is allowed to be written
-                                // Append open to header before function
-
-                                string strCat = Path.GetDirectoryName(Path.GetFullPath(sFilename));
-
-                                string strData = "bin" + iBinarySequence;
-                                string strFilename = strCat + "\\" + strData + ".bin";
-                                FileStream f = new FileStream(strFilename, FileMode.OpenOrCreate, FileAccess.Write);
-                                f.Write(oS.RequestBody, 0, oS.RequestBody.Length);
-                                f.Close();
-
-                                strbHead.AppendLine();
-                                strbHead.AppendLine(strData + " = open(\"" + strData + ".bin\");");
-                                strbHead.AppendLine();
-                                strbBody.Append(", " + strData);
-                                iBinarySequence++;
+                                bg = new Dictionary<string, List<Session>>();
                             }
                             else
                             {
-                                // Is text
-                                // Output BODY for POST
-
-                                string strBody = oS.GetRequestBodyAsString();
-                                //System.Text.Encoding.UTF8.GetString(oS.RequestBody);
-
-                                // Make sure we escape all double quotes " since we use double quotes for strings in the script
-
-                                strBody = strBody.Replace("\"", "\\\"");
-
-                                strbBody.Append(", \"" + strBody + "\"");
-                                if (headers.Exists("Content-Type"))
+                                if (bg == null)
                                 {
-                                    strbBody.Append(", { headers: { \"Content-Type\" : \"" + headers["Content-Type"] + "\"} }");
+                                    bg = new Dictionary<string, List<Session>>();
                                 }
                             }
                         }
 
 
-                        if ((inGroup) && (oS == oSessions.Last()))
-                        {
-                            // IF last request GROUP completed
+                        // If there is no referer header, set a __NO_REFERER referer
 
-                            strbBody.AppendLine("\t});");
-                            strbBody.AppendLine();
-                            inGroup = false;
-                        }
-                        else
+                        headers = oS.RequestHeaders;
+                        string refKey = headers.Exists("Referer") ? headers["Referer"] : "__NO_REFERER";
+
+                        if (!bg.ContainsKey(refKey))
                         {
+                            bg[refKey] = new List<Session>();
+                        }
+
+
+
+                        // Add request to batch
+
+                        bg[refKey].Add(oS);
+
+                        if (oS == oSessions.Last())
+                        {
+                            // Terminate batches - except first request since it will not be in a batch
+
+                            terminateBatches(bg, ref strbBody, ref strbHead, ref iBinarySequence, sFilename);
+
+                            // Dispose manually
+
+                            bg.Clear();
+                            bg = null;
+
+                            if (inGroup)
+                            {
+                                // IF last request GROUP completed
+
+                                strbBody.AppendLine("\t});");
+                                strbBody.AppendLine();
+                                inGroup = false;
+                            }
+                        }
+
+                        /*
+                        else
+                        { // end of line
                             strbBody.Append(");");
                             strbBody.AppendLine();
                         }
+                        */
 
                     } // endif tunnel
 
