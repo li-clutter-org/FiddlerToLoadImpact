@@ -1,5 +1,5 @@
-# Fiddler To Load Impact k6 script
-Export Fiddler recordings to Load Impact k6 script
+# Fiddler To Load Impact script
+Export Fiddler recordings to Load Impact k6 script _or_ to Load Impact Lua script
 
 Adding a new handler in Fiddler.js
 
