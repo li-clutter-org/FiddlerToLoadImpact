@@ -16,6 +16,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Web;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -330,13 +331,54 @@ math.randomseed(util.time())
                     }
 
                 }
+                else if (strContentType.Contains("application/x-www-form-urlencoded"))
+                {
+                    // url-decode and convert string into object for 
+                    //   - easy JS manipulation
+                    //   - readability (have you tried to read URL-encoded?)
+                    //   - no need to url-encode manually since k6 methods will do that automagically
+
+                    // Output BODY for POST
+
+                    string strBody = oS.GetRequestBodyAsString();
+
+                    // Split into objects
+
+                    System.Collections.Specialized.NameValueCollection dBody = HttpUtility.ParseQueryString(strBody);
+
+                    // Glue objects back together
+                    string strNewBody = "";
+                    int nKeys = dBody.Keys.Count;
+                    int iKey = 1;
+                    foreach (string key in dBody.Keys)
+                    {
+                        // Make sure we escape all double quotes " since we use double quotes for strings in the script
+                        // If it's the last of the keys, don't add , at the end (we count since order of keys is not guaranteed)
+                        if (iKey != nKeys)
+                        {
+                            strNewBody = strNewBody + "\"" + key + "\":\"" + dBody[key].Replace("\"", "\\\"") + "\",";
+                        }
+                        else
+                        {
+                            strNewBody = strNewBody + "\"" + key + "\":\"" + dBody[key].Replace("\"", "\\\"") + "\"";
+                        }
+                        iKey++;
+                    }
+
+
+                    strbBody.Append(", \"body\" :  {" + strNewBody + "}");
+                    if (headers.Exists("Content-Type"))
+                    {
+                        strbBody.Append(", \"params\" : { headers: { \"Content-Type\" : \"" + headers["Content-Type"] + "\"} }");
+                    }
+
+                }
                 else
                 {
                     // Is text
                     // Output BODY for POST
 
                     string strBody = oS.GetRequestBodyAsString();
-                    //System.Text.Encoding.UTF8.GetString(oS.RequestBody);
 
                     // Make sure we escape all double quotes " since we use double quotes for strings in the script
 
