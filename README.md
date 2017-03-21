@@ -54,13 +54,13 @@ Since classic Lua script and contemporary k6 javascript have different capabilit
 In classic Lua script request bodies that are URL-encoded will be strings and look slightly obfuscated since they are url-encoded as is. Something like this
 
 ```lua
-http.request\_batch({
+http.request_batch({
 
 {"POST",
 
 "http://loadimpactair.guldskeden.se/Pages/Booking", auto\_decompress = true,
 
-data = "\_\_EVENTTARGET=ctl00%24MainContent%24ddlDeparture&\_\_EVENTARGUMENT=&\_\_LASTFOCUS=&\_\_VIEWSTATE=&\_\_VIEWSTATEGENERATOR=A4196A29&\_\_EVENTVALIDATION=&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=-+Select+-", headers = {\["Content-Type"\] = "application/x-www-form-urlencoded"}}
+data = "__EVENTTARGET=ctl00%24MainContent%24ddlDeparture&__EVENTARGUMENT=&__LASTFOCUS=&__VIEWSTATE=&__VIEWSTATEGENERATOR=A4196A29&__EVENTVALIDATION=&ctl00%24MainContent%24ddlDeparture=1&ctl00%24MainContent%24ddlDestination=-+Select+-", headers = {["Content-Type"] = "application/x-www-form-urlencoded"}}
 
 })
 ```
@@ -68,17 +68,17 @@ data = "\_\_EVENTTARGET=ctl00%24MainContent%24ddlDeparture&\_\_EVENTARGUMENT=&\_
 In contemporary javascript bodies are not encoded as strings in script but rather url-encoded as the request is done. This allows the much more readable objects to be used for bodies. Something like this
 
 ```javascript
-http.batch(\[
+http.batch([
 
 {"method" : "POST",
 
 "url" : "http://loadimpactair.guldskeden.se/Pages/Booking",
 
-"body" : {"\_\_EVENTTARGET":"ctl00$MainContent$ddlDeparture","\_\_EVENTARGUMENT":"","\_\_LASTFOCUS":"","\_\_VIEWSTATE":"","\_\_VIEWSTATEGENERATOR":"A4196A29","\_\_EVENTVALIDATION":"","ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"- Select -"},
+"body" : {"__EVENTTARGET":"ctl00$MainContent$ddlDeparture","__EVENTARGUMENT":"","__LASTFOCUS":"","__VIEWSTATE":"","__VIEWSTATEGENERATOR":"A4196A29","__EVENTVALIDATION":"","ctl00$MainContent$ddlDeparture":"1","ctl00$MainContent$ddlDestination":"- Select -"},
 
 > "params" : { headers: { "Content-Type" : "application/x-www-form-urlencoded"} }},
 
-\]);
+]);
 ```
 
 **Binary data**
@@ -90,11 +90,11 @@ Also, it will change to transfer encoding to base64 regardless of what was used 
 A sample for a multipart/mime upload can be something like this:
 
 ```lua
-bin1 = \[\[ a very very long base64 encoding of the binary upload, like hundreds or even thousands of lines of it \]\]
+bin1 = [[ a very very long base64 encoding of the binary upload, like hundreds or even thousands of lines of it ]]
 
-http.request\_batch({
+http.request_batch({
 
-{"POST", "https://my.fake.sample.com/mydata/fenster/settings?SyncToken=LM%3d63692620%3bIDE03F0ABR%3d6361%3d13%3bSI%3d84%3bTD%3dTrue%3bSO%3d0%3bPI%3d49&View=FensterSettingsV2", auto\_decompress = true, data = \[\[
+{"POST", "https://my.fake.sample.com/mydata/fenster/settings?SyncToken=LM%3d63692620%3bIDE03F0ABR%3d6361%3d13%3bSI%3d84%3bTD%3dTrue%3bSO%3d0%3bPI%3d49&View=FensterSettingsV2", auto\_decompress = true, data = [[
 
 --{84FDFF35-F926-4B9D-9599-558815628CBE}
 
@@ -102,23 +102,23 @@ Content-Type: application/web3s+xml
 
 Content-ID: Settings
 
-&lt;?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?&gt;&lt;Items&gt;&lt;Folder&gt;&lt;RelationshipName&gt;windows-slideshow&lt;/RelationshipName&gt;&lt;RoleDefinitionName&gt;WindowsSettingsFolder&lt;/RoleDefinitionName&gt;&lt;WriteMode&gt;CreateOrUpdate&lt;/WriteMode&gt;&lt;Items&gt;&lt;Document&gt;&lt;RelationshipName&gt;SlideShow&lt;/RelationshipName&gt;&lt;ETag&gt;E03F0AB241D3E649!147.382&lt;/ETag&gt;&lt;WriteMode&gt;Update&lt;/WriteMode&gt;&lt;DateModifiedOnClient&gt;2017-01-05T09:23:42.929Z&lt;/DateModifiedOnClient&gt;&lt;windowssettings.xschema.drx.live.com&gt;&lt;CreationId&gt;0&lt;/CreationId&gt;&lt;/windowssettings.xschema.drx.live.com&gt;&lt;/Document&gt;&lt;/Items&gt;&lt;/Folder&gt;&lt;/Items&gt;
+<?xml version=\"1.0\" encoding=\"UTF-8\"?><Items><Folder><RelationshipName>windows-slideshow</RelationshipName><RoleDefinitionName>WindowsSettingsFolder</RoleDefinitionName&gt<WriteMode>CreateOrUpdate</WriteMode><Items><Document><RelationshipName>SlideShow</RelationshipName><ETag>E03F0AB241D3E649!147.382</ETag><WriteMode>Update</WriteMode><DateModifiedOnClient>2017-01-05T09:23:42.929Z</DateModifiedOnClient><windowssettings.xschema.drx.live.com><CreationId>0</CreationId></windowssettings.xschema.drx.live.com></Document></Items></Folder></Items>
 
 --{84FDFF35-F926-4B9D-9599-558815628CBE}
 
 Content-Type: application/octet-stream
 
-Content-ID: &lt;windows-slideshow/SlideShow:Binary&gt;
+Content-ID: <windows-slideshow/SlideShow:Binary>
 
 Content-Transfer-Encoding: base64
 
-\]\] .. bin1 .. \[\[
+]] .. bin1 .. [[
 
 --{84FDFF35-F926-4B9D-9599-558815628CBE}--
 
-\]\]
+]]
 
-, headers = {\["Content-Type"\] = "multipart/related;boundary=\\"{84FDFF35-F926-4B9D-9599-558815628CBE}\\""}},
+, headers = {["Content-Type"] = "multipart/related;boundary=\"{84FDFF35-F926-4B9D-9599-558815628CBE}\""}},
 
 })
 ```
@@ -132,9 +132,9 @@ Something like this is the script result
 ```javascript
 bin1 = open("bin1.bin");
 
-http.batch(\[
+http.batch([
 
-{"method" : "POST", "url" : "https://my.fake.sample.com/mydata/fenster/settings?SyncToken=LM%3d63619200%3bIAB29!111%3bLR%3d6bEP%3d13%3bSI%3d84%3bTD%3dTrue%3bSO%3d0%3bPI%3d49&View=FensterSettingsV2", "body" : \`
+{"method" : "POST", "url" : "https://my.fake.sample.com/mydata/fenster/settings?SyncToken=LM%3d63619200%3bIAB29!111%3bLR%3d6bEP%3d13%3bSI%3d84%3bTD%3dTrue%3bSO%3d0%3bPI%3d49&View=FensterSettingsV2", "body" : `
 
 --{84FDFF35-F926-4B9D-9599-558815628CBE}
 
@@ -142,23 +142,24 @@ Content-Type: application/web3s+xml
 
 Content-ID: Settings
 
-&lt;?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?&gt;&lt;Items&gt;&lt;Folder&gt;&lt;RelationshipName&gt;windows-slideshow&lt;/RelationshipName&gt;&lt;RoleDefinitionName&gt;WindowsSettingsFolder&lt;/RoleDefinitionName&gt;&lt;WriteMode&gt;CreateOrUpdate&lt;/WriteMode&gt;&lt;Items&gt;&lt;Document&gt;&lt;RelationshipName&gt;SlideShow&lt;/RelationshipName&gt;&lt;ETag&gt;E03F0AB241D3E649!147.382&lt;/ETag&gt;&lt;WriteMode&gt;Update&lt;/WriteMode&gt;&lt;DateModifiedOnClient&gt;2017-01-05T09:23:42.929Z&lt;/DateModifiedOnClient&gt;&lt;windowssettings.xschema.drx.live.com&gt;&lt;CreationId&gt;0&lt;/CreationId&gt;&lt;/windowssettings.xschema.drx.live.com&gt;&lt;/Document&gt;&lt;/Items&gt;&lt;/Folder&gt;&lt;/Items&gt;
+<?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?><Items><Folder><RelationshipName>windows-slideshow</RelationshipName><RoleDefinitionName>WindowsSettingsFolder</RoleDefinitionName><WriteMode>CreateOrUpdate</WriteMode><Items><Document><RelationshipName>SlideShow</RelationshipName><ETag>E03F0AB241D3E649!147.382</ETag><WriteMode>Update</WriteMode><DateModifiedOnClient>2017-01-05T09:23:42.929Z</DateModifiedOnClient><windowssettings.xschema.drx.live.com><CreationId>0</CreationId></windowssettings.xschema.drx.live.com></Document></Items></Folder></Items>
+
 
 --{84FDFF35-F926-4B9D-9599-558815628CBE}
 
 Content-Type: application/octet-stream
 
-Content-ID: &lt;windows-slideshow/SlideShow:Binary&gt;
+Content-ID: <windows-slideshow/SlideShow:Binary>
 
 Content-Transfer-Encoding: binary
 
-\` + bin1 + \`
+` + bin1 + `
 
---{84FDFF35-F926-4B9D-9599-558815628CBE}--\`
+--{84FDFF35-F926-4B9D-9599-558815628CBE}--`
 
-, "params" : { headers: { "Content-Type" : "multipart/related;boundary=\\"{84FDFF35-F926-4B9D-9599-558815628CBE}\\""} }},
+, "params" : { headers: { "Content-Type" : "multipart/related;boundary=\"{84FDFF35-F926-4B9D-9599-558815628CBE}\""} }},
 
-\]);
+]);
 ```
 
 Installing
@@ -186,18 +187,18 @@ There you find the handler class (class Handlers) and add this as a new handler 
 
 ```javascript
 public static ContextAction("set Load Impact Group Name")
-function DoSetLIGroupName(oSessions: Session\[\]) {
-if (oSessions == null)
-{
-MessageBox.Show("Please select session(s) to set LI Group Name for", "No action");
-return;
-}
-var sString: String = FiddlerObject.prompt("LI Group Name", "", "LI Group Name");
-for (var x:int = 0; x &lt; oSessions.Length; x++)
-{
-oSessions\[x\]\["addon.loadimpact.ligroup"\] = sString;
-}
-FiddlerApplication.UI.RefreshRange(oSessions);
+  function DoSetLIGroupName(oSessions: Session[]) {
+    if (oSessions == null)
+    {
+      MessageBox.Show("Please select session(s) to set LI Group Name for", "No action");
+      return;
+    }
+    var sString: String = FiddlerObject.prompt("LI Group Name", "", "LI Group Name");
+    for (var x:int = 0; x &lt; oSessions.Length; x++)
+    {
+      oSessions[x]["addon.loadimpact.ligroup"] = sString;
+    }
+    FiddlerApplication.UI.RefreshRange(oSessions);
 }
 ```
 
@@ -210,7 +211,7 @@ But there must be a column to hold the value as well. That is defined inside the
 So lookup the main function static function Main() and insert the following code in it
 
 ```javascript
-FiddlerObject.UI.lvSessions.AddBoundColumn("LI Group", 512, "addon.loadimpact.ligroup");
+  FiddlerObject.UI.lvSessions.AddBoundColumn("LI Group", 512, "addon.loadimpact.ligroup");
 ```
 
 This adds a named column, "LI Group", of size 512 characters and with the o-flag "addon.loadimpact.ligroup". Both the o-flag value and the column name are used in the exporter so don't change them unless you really know what you're doing and update the exporter code as well.
