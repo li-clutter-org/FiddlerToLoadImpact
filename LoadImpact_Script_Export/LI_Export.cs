@@ -451,13 +451,11 @@ math.randomseed(util.time())
                     // Load in-script
                     // Use base64-blob and convert content-type
 
-                    string strCat = Path.GetDirectoryName(Path.GetFullPath(sFilename));
-
                     string strData = "bin" + iBinarySequence;
 
                     strbHead.AppendLine(strData + " = [[");
                     string binBase64 = Convert.ToBase64String(oS.RequestBody, Base64FormattingOptions.None);
-                    strbHead.AppendLine();
+                    strbHead.AppendLine(binBase64);
                     strbHead.AppendLine("]]");
                     strbBody.Append(", data = " + strData);
                     iBinarySequence++;
