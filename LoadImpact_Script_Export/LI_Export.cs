@@ -123,7 +123,6 @@ math.randomseed(util.time())
             foreach (MimePart part in multipart)
             {
                 strbBody.AppendLine();
-                strbBody.AppendLine();
                 strbBody.AppendLine("--" + multipart.Boundary);
 
                 foreach (Header head in part.Headers)
@@ -160,7 +159,7 @@ math.randomseed(util.time())
                         strbHead.AppendLine(binBase64);
                         strbHead.AppendLine("]]");
 
-                        strbBody.Append("]] .. " + strData + " .. [[");
+                        strbBody.AppendLine("]] .. " + strData + " .. [[");
                         iSequence++;
 
                     }
@@ -190,7 +189,6 @@ math.randomseed(util.time())
 
             foreach (MimePart part in multipart)
             {
-                strbBody.AppendLine();
                 strbBody.AppendLine();
                 strbBody.AppendLine("--" + multipart.Boundary);
 
