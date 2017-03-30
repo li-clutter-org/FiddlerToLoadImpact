@@ -194,7 +194,7 @@ public static ContextAction("set Load Impact Group Name")
       return;
     }
     var sString: String = FiddlerObject.prompt("LI Group Name", "", "LI Group Name");
-    for (var x:int = 0; x &lt; oSessions.Length; x++)
+    for (var x:int = 0; x < oSessions.Length; x++)
     {
       oSessions[x]["addon.loadimpact.ligroup"] = sString;
     }
