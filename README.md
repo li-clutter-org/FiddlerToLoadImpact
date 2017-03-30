@@ -25,7 +25,7 @@ But that’s not all! We have added a little extra that helps in grouping transa
 
 Rather than grouping this manually by refactoring your script code once produced you can label your groups (or pages) in Fiddler before exporting them.
 
-The install adds a column named “LI Group which holds the name of the group of requests you want to bundle in a *page* or *group*.
+The install adds a column named "LI Group" which holds the name of the group of requests you want to bundle in a *page* or *group*.
 
 <img src="media/image2.png" width="624" height="234" />
 
@@ -183,7 +183,7 @@ Now you will need to add a new handler for the context menu in Fiddler. You do t
 
 <img src="media/image6.png" width="622" height="242" />
 
-There you find the handler class (class Handlers) and add this as a new handler for the context meny
+There you find the handler class (class Handlers) and add this as a new handler for the context menu
 
 ```javascript
 public static ContextAction("set Load Impact Group Name")
